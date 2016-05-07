@@ -3,6 +3,7 @@
 
 #define BOARD_S 6
 #define MAX_POSS_MOVES_FOR_BOARD 12
+#define MAX_DEPTH 10
 
 struct board;
 typedef struct board
@@ -10,9 +11,11 @@ typedef struct board
   int player;
   int pos[BOARD_S*BOARD_S];
   struct board *moves;
+  int moves_known;
   int n_moves;
-  int best;
+  int best_i;
   int score;
+  int heuristic;
 } board;
 int i(int x,int y)
 {
@@ -25,6 +28,12 @@ int posValid(int x, int y)
     y >= 0 && y < BOARD_S;
 }
 
+void zeroBoard(board *b)
+{
+  b->moves = 0;
+  b->moves_known = 0;
+  b->n_moves = 0;
+}
 void initBoard(board *b)
 {
   for(int y = 0; y < BOARD_S; y++)
@@ -119,6 +128,8 @@ void possibleMoves(board *b)
 {
   board *boards = (board *)malloc(sizeof(board)*MAX_POSS_MOVES_FOR_BOARD);
   if(boards == 0) printf("nomem!\n");
+  for(int i = 0; i < MAX_POSS_MOVES_FOR_BOARD; i++)
+    zeroBoard(&boards[i]);
 
   int boards_i = 0;
   for(int y = 0; y < BOARD_S; y++)
@@ -147,6 +158,7 @@ void possibleMoves(board *b)
   free(boards);
 
   b->n_moves = boards_i;
+  b->moves_known = 1;
 }
 
 int rateBoard(board *b) //+ for p1, - for p2
@@ -161,25 +173,31 @@ int rateBoard(board *b) //+ for p1, - for p2
       if(b->pos[i(x,y)] == 2) n_2++;
     }
   }
-  return n_1-n_2;
+  b->heuristic = n_1-n_2;
+  return b->heuristic;
 }
 
-int bestMove(board *b, int depth)
+int plotMoves(board *b, int depth)
 {
-  possibleMoves(b);
+  if(!b->moves_known && depth < MAX_DEPTH) possibleMoves(b);
 
-  if(b->n_moves == 0)
+  if(!b->moves_known && depth >= MAX_DEPTH)
+  {
+    return rateBoard(b);
+  }
+  if(b->moves_known && b->n_moves == 0)
   {
     b->score = rateBoard(b);
     return b->score;
   }
 
   int best_i = 0;
-  int best_s = bestMove(&b->moves[0],depth+1);
+  int best_s = plotMoves(&b->moves[0],depth+1);
   int s;
   for(int i = 1; i < b->n_moves; i++)
   {
-    s = bestMove(&b->moves[i],depth+1);
+    s = plotMoves(&b->moves[i],depth+1);
+
     if(
       (b->player == 1 && s > best_s) ||
       (b->player == 2 && s < best_s)
@@ -190,14 +208,14 @@ int bestMove(board *b, int depth)
     }
   }
 
-  b->best = best_i;
+  b->best_i = best_i;
   b->score = best_s;
   return best_s;
 }
 
 void cleanupBoard(board *b)
 {
-  if(b->n_moves)
+  if(b->moves_known && b->n_moves)
   {
     for(int i = 0; i < b->n_moves; i++)
       cleanupBoard(&b->moves[i]);
@@ -210,16 +228,17 @@ int main()
   board b;
   initBoard(&b);
   b.player = 1;
-  bestMove(&b,0);
+  plotMoves(&b,0);
 
   board *t;
   t = &b;
 
-  while(t->n_moves)
+  while(t->moves_known && t->n_moves)
   {
     printBoard(t);
     printf("\n");
-    t = &t->moves[t->best];
+    t = &t->moves[t->best_i];
+    plotMoves(t,0);
   }
   printBoard(t);
 
