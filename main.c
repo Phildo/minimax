@@ -12,6 +12,12 @@ int i(int x,int y)
 {
   return y*BOARD_S+x;
 }
+int posValid(int x, int y)
+{
+  return
+    x >= 0 && x < BOARD_S &&
+    y >= 0 && y < BOARD_S;
+}
 
 void initBoard(board *b)
 {
@@ -65,6 +71,28 @@ void printBoard(board *b)
   }
 }
 
+void appendBoards(board *b, int player, int x, int y, int xdir, int ydir, board *boards, int *boards_i)
+{
+  if(posValid(x+xdir,y+ydir))
+  {
+    if(b->pos[i(x+xdir,y+ydir)] == 0) //move
+    {
+      copyBoardSwap(b,x,y,x+xdir,y+ydir,&boards[*boards_i]);
+      *boards_i = *boards_i+1;
+    }
+    else if( //jump
+      b->pos[i(x+xdir,y+ydir)] != player &&
+      posValid(x+(2*xdir),y+(2*ydir)) &&
+      b->pos[i(x+(2*xdir),y+(2*ydir))] == 0
+    )
+    {
+      copyBoardSwap(b,x,y,x+(2*xdir),y+(2*ydir),&boards[*boards_i]);
+      boards[*boards_i].pos[i(x+xdir,y+ydir)] = 0;
+      *boards_i = *boards_i+1;
+    }
+  }
+}
+
 void possibleMoves(board *b, int player, board **moves, int *n_moves)
 {
   board *boards = (board *)malloc(sizeof(board)*MAX_POSS_MOVES_FOR_BOARD);
@@ -75,22 +103,8 @@ void possibleMoves(board *b, int player, board **moves, int *n_moves)
     {
       if(b->pos[i(x,y)] == player)
       {
-        if(player == 1)
-        {
-          if(y+1 < BOARD_S)
-          {
-            if(x+1 < BOARD_S && b->pos[i(x+1,y+1)] == 0) { copyBoardSwap(b,x,y,x+1,y+1,&boards[boards_i]); boards_i++; }
-            if(x-1 >= 0      && b->pos[i(x-1,y+1)] == 0) { copyBoardSwap(b,x,y,x-1,y+1,&boards[boards_i]); boards_i++; }
-          }
-        }
-        if(player == 2)
-        {
-          if(y-1 >= 0)
-          {
-            if(x+1 < BOARD_S && b->pos[i(x+1,y-1)] == 0) { copyBoardSwap(b,x,y,x+1,y-1,&boards[boards_i]); boards_i++; }
-            if(x-1 >= 0      && b->pos[i(x-1,y-1)] == 0) { copyBoardSwap(b,x,y,x-1,y-1,&boards[boards_i]); boards_i++; }
-          }
-        }
+        appendBoards(b, player, x, y, -1, (player == 1 ? 1 : -1), boards, &boards_i);
+        appendBoards(b, player, x, y,  1, (player == 1 ? 1 : -1), boards, &boards_i);
       }
     }
   }
@@ -153,12 +167,14 @@ int main()
   board best;
   initBoard(&b);
   printBoard(&b);
-
   printf("\n");
-  bestMove(&b,1,&best);
-  printBoard(&best);
-  copyBoard(&best,&b);
-  bestMove(&b,2,&best);
-  printBoard(&best);
+
+  for(int i = 0; i < 10; i++)
+  {
+    bestMove(&b,i%2 ? 2 : 1,&best);
+    printBoard(&best);
+    copyBoard(&best,&b);
+    printf("\n");
+  }
 }
 
