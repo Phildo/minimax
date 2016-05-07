@@ -1,7 +1,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define BOARD_S 5
+#define BOARD_S 6
 #define MAX_POSS_MOVES_FOR_BOARD 100
 
 typedef struct
@@ -130,13 +130,8 @@ void possibleMoves(board *b, int player, board **moves, int *n_moves)
   *n_moves = boards_i;
 }
 
-void bestMove(board *b, int player, board *best);
-int rateBoard(board *b, int player) //+ for p1, - for p2
+int rateBoard(board *b) //+ for p1, - for p2
 {
-  board best;
-  bestMove(b, player, &best);
-
-  //simple heuristic
   int n_1 = 0;
   int n_2 = 0;
   for(int y = 0; y < BOARD_S; y++)
@@ -150,20 +145,27 @@ int rateBoard(board *b, int player) //+ for p1, - for p2
   return n_1-n_2;
 }
 
-void bestMove(board *b, int player, board *best)
+int bestMove(board *b, int player, board *best)
 {
   board *moves;
   int n_moves;
+
   possibleMoves(b, player, &moves, &n_moves);
 
-  if(n_moves == 0) { copyBoard(b,best); return; }
+  if(n_moves == 0)
+  {
+    copyBoard(b,best);
+    return rateBoard(b);
+  }
+
+  board worst;
 
   int best_i = 0;
-  int best_s = rateBoard(&moves[0], player == 1 ? 2 : 1);
+  int best_s = bestMove(&moves[0], player == 1 ? 2 : 1, &worst);
   int s;
   for(int i = 1; i < n_moves; i++)
   {
-    s = rateBoard(&moves[i], player == 1 ? 2 : 1);
+    s = bestMove(&moves[i], player == 1 ? 2 : 1, &worst);
     if(
       (player == 1 && s > best_s) ||
       (player == 2 && s < best_s)
@@ -176,6 +178,7 @@ void bestMove(board *b, int player, board *best)
 
   copyBoard(&moves[best_i],best);
   free(moves);
+  return best_s;
 }
 
 int main()
