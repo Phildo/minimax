@@ -1,12 +1,18 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define BOARD_S 6
-#define MAX_POSS_MOVES_FOR_BOARD 100
+#define BOARD_S 5
+#define MAX_POSS_MOVES_FOR_BOARD 5
 
-typedef struct
+struct board;
+typedef struct board
 {
+  int player;
   int pos[BOARD_S*BOARD_S];
+  struct board *moves;
+  int n_moves;
+  int best;
+  int score;
 } board;
 int i(int x,int y)
 {
@@ -37,6 +43,7 @@ void initBoard(board *b)
 
 void copyBoard(board *from, board *to)
 {
+  to->player = from->player;
   for(int y = 0; y < BOARD_S; y++)
   {
     for(int x = 0; x < BOARD_S; x++)
@@ -46,12 +53,11 @@ void copyBoard(board *from, board *to)
   }
 }
 
-void copyBoardSwap(board *from, int x0, int y0, int x1, int y1, board *to)
+void boardSwap(int x0, int y0, int x1, int y1, board *b)
 {
-  copyBoard(from,to);
-  int tmp = to->pos[i(x0,y0)];
-  to->pos[i(x0,y0)] = to->pos[i(x1,y1)];
-  to->pos[i(x1,y1)] = tmp;
+  int tmp = b->pos[i(x0,y0)];
+  b->pos[i(x0,y0)] = b->pos[i(x1,y1)];
+  b->pos[i(x1,y1)] = tmp;
 }
 
 int cmpBoard(board *a, board *b)
@@ -83,29 +89,33 @@ void printBoard(board *b)
   }
 }
 
-void appendBoards(board *b, int player, int x, int y, int xdir, int ydir, board *boards, int *boards_i)
+void appendBoards(board *b, int x, int y, int xdir, int ydir, board *boards, int *boards_i)
 {
   if(posValid(x+xdir,y+ydir))
   {
     if(b->pos[i(x+xdir,y+ydir)] == 0) //move
     {
-      copyBoardSwap(b,x,y,x+xdir,y+ydir,&boards[*boards_i]);
+      copyBoard(b,&boards[*boards_i]);
+      boardSwap(x,y,x+xdir,y+ydir,&boards[*boards_i]);
+      boards[*boards_i].player = b->player == 1 ? 2 : 1;
       *boards_i = *boards_i+1;
     }
     else if( //jump
-      b->pos[i(x+xdir,y+ydir)] != player &&
+      b->pos[i(x+xdir,y+ydir)] != b->player &&
       posValid(x+(2*xdir),y+(2*ydir)) &&
       b->pos[i(x+(2*xdir),y+(2*ydir))] == 0
     )
     {
-      copyBoardSwap(b,x,y,x+(2*xdir),y+(2*ydir),&boards[*boards_i]);
+      copyBoard(b,&boards[*boards_i]);
+      boardSwap(x,y,x+(2*xdir),y+(2*ydir),&boards[*boards_i]);
       boards[*boards_i].pos[i(x+xdir,y+ydir)] = 0;
+      boards[*boards_i].player = b->player == 1 ? 2 : 1;
       *boards_i = *boards_i+1;
     }
   }
 }
 
-void possibleMoves(board *b, int player, board **moves, int *n_moves)
+void possibleMoves(board *b)
 {
   board *boards = (board *)malloc(sizeof(board)*MAX_POSS_MOVES_FOR_BOARD);
   int boards_i = 0;
@@ -113,21 +123,20 @@ void possibleMoves(board *b, int player, board **moves, int *n_moves)
   {
     for(int x = 0; x < BOARD_S; x++)
     {
-      if(b->pos[i(x,y)] == player)
+      if(b->pos[i(x,y)] == b->player)
       {
-        appendBoards(b, player, x, y, -1, (player == 1 ? 1 : -1), boards, &boards_i);
-        appendBoards(b, player, x, y,  1, (player == 1 ? 1 : -1), boards, &boards_i);
+        appendBoards(b, x, y, -1, (b->player == 1 ? 1 : -1), boards, &boards_i);
+        appendBoards(b, x, y,  1, (b->player == 1 ? 1 : -1), boards, &boards_i);
       }
     }
   }
 
-  board *trimmed_boards = (board *)malloc(sizeof(board)*boards_i);
+  b->moves = (board *)malloc(sizeof(board)*boards_i);
   for(int i = 0; i < boards_i; i++)
-    trimmed_boards[i] = boards[i];
+    b->moves[i] = boards[i];
   free(boards);
 
-  *moves = trimmed_boards;
-  *n_moves = boards_i;
+  b->n_moves = boards_i;
 }
 
 int rateBoard(board *b) //+ for p1, - for p2
@@ -145,30 +154,25 @@ int rateBoard(board *b) //+ for p1, - for p2
   return n_1-n_2;
 }
 
-int bestMove(board *b, int player, board *best)
+int bestMove(board *b)
 {
-  board *moves;
-  int n_moves;
+  possibleMoves(b);
 
-  possibleMoves(b, player, &moves, &n_moves);
-
-  if(n_moves == 0)
+  if(b->n_moves == 0)
   {
-    copyBoard(b,best);
-    return rateBoard(b);
+    b->score = rateBoard(b);
+    return b->score;
   }
 
-  board worst;
-
   int best_i = 0;
-  int best_s = bestMove(&moves[0], player == 1 ? 2 : 1, &worst);
+  int best_s = bestMove(&b->moves[0]);
   int s;
-  for(int i = 1; i < n_moves; i++)
+  for(int i = 1; i < b->n_moves; i++)
   {
-    s = bestMove(&moves[i], player == 1 ? 2 : 1, &worst);
+    s = bestMove(&b->moves[i]);
     if(
-      (player == 1 && s > best_s) ||
-      (player == 2 && s < best_s)
+      (b->player == 1 && s > best_s) ||
+      (b->player == 2 && s < best_s)
     )
     {
       best_s = s;
@@ -176,26 +180,27 @@ int bestMove(board *b, int player, board *best)
     }
   }
 
-  copyBoard(&moves[best_i],best);
-  free(moves);
+  b->best = best_i;
+  b->score = best_s;
   return best_s;
 }
 
 int main()
 {
   board b;
-  board best;
-  initBoard(&best);
-  printf("\n");
+  initBoard(&b);
+  b.player = 1;
+  bestMove(&b);
 
-  int turn = 0;
-  while(turn == 0 || !cmpBoard(&b,&best))
+  board *t;
+  t = &b;
+
+  while(t->n_moves)
   {
-    printBoard(&best);
-    copyBoard(&best,&b);
-    bestMove(&b,turn%2 ? 2 : 1,&best);
-    turn++;
+    printBoard(t);
     printf("\n");
+    t = &t->moves[t->best];
   }
+  printBoard(t);
 }
 
