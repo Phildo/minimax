@@ -2,6 +2,7 @@
 #include "stdlib.h"
 
 #define BOARD_S 4
+#define MAX_POSS_MOVES_FOR_BOARD 100
 
 typedef struct
 {
@@ -28,7 +29,7 @@ void initBoard(board *b)
   }
 }
 
-void copyBoardSwap(board *from, int x0, int y0, int x1, int y1, board *to)
+void copyBoard(board *from, board *to)
 {
   for(int y = 0; y < BOARD_S; y++)
   {
@@ -37,6 +38,11 @@ void copyBoardSwap(board *from, int x0, int y0, int x1, int y1, board *to)
       to->pos[i(x,y)] = from->pos[i(x,y)];
     }
   }
+}
+
+void copyBoardSwap(board *from, int x0, int y0, int x1, int y1, board *to)
+{
+  copyBoard(from,to);
   int tmp = to->pos[i(x0,y0)];
   to->pos[i(x0,y0)] = to->pos[i(x1,y1)];
   to->pos[i(x1,y1)] = tmp;
@@ -61,7 +67,7 @@ void printBoard(board *b)
 
 void possibleMoves(board *b, int player, board **moves, int *n_moves)
 {
-  board *boards = (board *)malloc(sizeof(board)*100);
+  board *boards = (board *)malloc(sizeof(board)*MAX_POSS_MOVES_FOR_BOARD);
   int boards_i = 0;
   for(int y = 0; y < BOARD_S; y++)
   {
@@ -98,20 +104,61 @@ void possibleMoves(board *b, int player, board **moves, int *n_moves)
   *n_moves = boards_i;
 }
 
+int rateBoard(board *b) //+ for p1, - for p2
+{
+  int n_1 = 0;
+  int n_2 = 0;
+  for(int y = 0; y < BOARD_S; y++)
+  {
+    for(int x = 0; x < BOARD_S; x++)
+    {
+      if(b->pos[i(x,y)] == 1) n_1++;
+      if(b->pos[i(x,y)] == 2) n_2++;
+    }
+  }
+  return n_1-n_2;
+}
+
+void bestMove(board *b, int player, board *best)
+{
+  board *moves;
+  int n_moves;
+  possibleMoves(b, player, &moves, &n_moves);
+
+  if(n_moves == 0) { copyBoard(b,best); return; }
+
+  int best_i = 0;
+  int best_s = rateBoard(&moves[0]);
+  int s;
+  for(int i = 1; i < n_moves; i++)
+  {
+    s = rateBoard(&moves[i]);
+    if(
+      (player == 1 && s > best_s) ||
+      (player == 2 && s < best_s)
+    )
+    {
+      best_s = s;
+      best_i = i;
+    }
+  }
+
+  copyBoard(&moves[best_i],best);
+  free(moves);
+}
+
 int main()
 {
   board b;
+  board best;
   initBoard(&b);
   printBoard(&b);
 
-  board *moves;
-  int n_moves;
-  possibleMoves(&b, 1, &moves, &n_moves);
-
-  for(int i = 0; i < n_moves; i++)
-  {
-    printf("Move %d:\n",i);
-    printBoard(&moves[i]);
-  }
+  printf("\n");
+  bestMove(&b,1,&best);
+  printBoard(&best);
+  copyBoard(&best,&b);
+  bestMove(&b,2,&best);
+  printBoard(&best);
 }
 
