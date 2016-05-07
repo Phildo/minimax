@@ -1,8 +1,8 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define BOARD_S 5
-#define MAX_POSS_MOVES_FOR_BOARD 5
+#define BOARD_S 6
+#define MAX_POSS_MOVES_FOR_BOARD 12
 
 struct board;
 typedef struct board
@@ -118,6 +118,8 @@ void appendBoards(board *b, int x, int y, int xdir, int ydir, board *boards, int
 void possibleMoves(board *b)
 {
   board *boards = (board *)malloc(sizeof(board)*MAX_POSS_MOVES_FOR_BOARD);
+  if(boards == 0) printf("nomem!\n");
+
   int boards_i = 0;
   for(int y = 0; y < BOARD_S; y++)
   {
@@ -131,9 +133,17 @@ void possibleMoves(board *b)
     }
   }
 
-  b->moves = (board *)malloc(sizeof(board)*boards_i);
-  for(int i = 0; i < boards_i; i++)
-    b->moves[i] = boards[i];
+  if(boards_i >= MAX_POSS_MOVES_FOR_BOARD)
+    printf("badmax! %d\n",boards_i);
+
+  if(boards_i > 0)
+  {
+    b->moves = (board *)malloc(sizeof(board)*boards_i);
+    if(b->moves == 0) printf("nomem!\n");
+
+    for(int i = 0; i < boards_i; i++)
+      b->moves[i] = boards[i];
+  }
   free(boards);
 
   b->n_moves = boards_i;
@@ -154,7 +164,7 @@ int rateBoard(board *b) //+ for p1, - for p2
   return n_1-n_2;
 }
 
-int bestMove(board *b)
+int bestMove(board *b, int depth)
 {
   possibleMoves(b);
 
@@ -165,11 +175,11 @@ int bestMove(board *b)
   }
 
   int best_i = 0;
-  int best_s = bestMove(&b->moves[0]);
+  int best_s = bestMove(&b->moves[0],depth+1);
   int s;
   for(int i = 1; i < b->n_moves; i++)
   {
-    s = bestMove(&b->moves[i]);
+    s = bestMove(&b->moves[i],depth+1);
     if(
       (b->player == 1 && s > best_s) ||
       (b->player == 2 && s < best_s)
@@ -185,12 +195,22 @@ int bestMove(board *b)
   return best_s;
 }
 
+void cleanupBoard(board *b)
+{
+  if(b->n_moves)
+  {
+    for(int i = 0; i < b->n_moves; i++)
+      cleanupBoard(&b->moves[i]);
+    free(b->moves);
+  }
+}
+
 int main()
 {
   board b;
   initBoard(&b);
   b.player = 1;
-  bestMove(&b);
+  bestMove(&b,0);
 
   board *t;
   t = &b;
@@ -202,5 +222,7 @@ int main()
     t = &t->moves[t->best];
   }
   printBoard(t);
+
+  cleanupBoard(&b);
 }
 

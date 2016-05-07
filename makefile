@@ -5,3 +5,6 @@ run: main.c
 debug:
 	gcc -ggdb3 main.c -o a.out && gdb -q ./a.out
 
+valgrind:
+	gcc -g -O0 main.c -o a.out && valgrind -v --leak-check=yes --leak-check=full --show-leak-kinds=all ./a.out
+
