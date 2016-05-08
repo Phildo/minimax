@@ -1,15 +1,16 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define BOARD_S 6
-#define MAX_POSS_MOVES_FOR_BOARD 12
-#define MAX_DEPTH 10
+#define BOARD_S 10
+#define INIT_ROWS 2
+#define MAX_POSS_MOVES_FOR_BOARD 20
+#define MAX_DEPTH 6
 
 struct board;
 typedef struct board
 {
   int player;
-  int pos[BOARD_S*BOARD_S];
+  unsigned char pos[(BOARD_S*BOARD_S)/2];
   struct board *moves;
   int moves_known;
   int n_moves;
@@ -19,11 +20,12 @@ typedef struct board
 } board;
 int i(int x,int y)
 {
-  return y*BOARD_S+x;
+  return (y*BOARD_S+x)/2;
 }
 int posValid(int x, int y)
 {
   return
+    (x+y)%2 != 0 &&
     x >= 0 && x < BOARD_S &&
     y >= 0 && y < BOARD_S;
 }
@@ -40,9 +42,10 @@ void initBoard(board *b)
   {
     for(int x = 0; x < BOARD_S; x++)
     {
-      if(y == 0)
+      if(!posValid(x,y)) continue;
+      if(y < INIT_ROWS)
         b->pos[i(x,y)] = (y%2+x)%2;
-      else if(y == BOARD_S-1)
+      else if(y >= BOARD_S-INIT_ROWS)
         b->pos[i(x,y)] = ((y%2+x)%2)*2;
       else
         b->pos[i(x,y)] = 0;
@@ -53,13 +56,8 @@ void initBoard(board *b)
 void copyBoard(board *from, board *to)
 {
   to->player = from->player;
-  for(int y = 0; y < BOARD_S; y++)
-  {
-    for(int x = 0; x < BOARD_S; x++)
-    {
-      to->pos[i(x,y)] = from->pos[i(x,y)];
-    }
-  }
+  for(int i = 0; i < (BOARD_S*BOARD_S)/2; i++)
+    to->pos[i] = from->pos[i];
 }
 
 void boardSwap(int x0, int y0, int x1, int y1, board *b)
@@ -71,13 +69,8 @@ void boardSwap(int x0, int y0, int x1, int y1, board *b)
 
 int cmpBoard(board *a, board *b)
 {
-  for(int y = 0; y < BOARD_S; y++)
-  {
-    for(int x = 0; x < BOARD_S; x++)
-    {
-      if(a->pos[i(x,y)] != b->pos[i(x,y)]) return 0;
-    }
-  }
+  for(int i = 0; i < (BOARD_S*BOARD_S)/2; i++)
+    if(a->pos[i] != b->pos[i]) return 0;
   return 1;
 }
 
@@ -87,6 +80,8 @@ void printBoard(board *b)
   {
     for(int x = 0; x < BOARD_S; x++)
     {
+      if(!posValid(x,y)) printf(".");
+      else
       switch(b->pos[i(x,y)])
       {
         case 0: printf("."); break;
@@ -230,13 +225,13 @@ int main()
   b.player = 1;
   plotMoves(&b,0);
 
-  board *t;
-  t = &b;
+  board *t = &b;
 
-  while(t->moves_known && t->n_moves)
+  while(t->n_moves)
   {
     printBoard(t);
     printf("\n");
+    fflush(0);
     t = &t->moves[t->best_i];
     plotMoves(t,0);
   }
