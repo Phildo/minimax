@@ -9,14 +9,14 @@
 struct board;
 typedef struct board
 {
-  int player;
+  unsigned char player;
   unsigned char pos[(BOARD_S*BOARD_S)/2];
   struct board *moves;
-  int moves_known;
-  int n_moves;
-  int best_i;
-  int score;
-  int heuristic;
+  unsigned char moves_known;
+  unsigned char n_moves;
+  unsigned char best_i;
+  unsigned char score;
+  unsigned char heuristic;
 } board;
 int i(int x,int y)
 {
@@ -222,6 +222,7 @@ int main()
 {
   board b;
   initBoard(&b);
+  zeroBoard(&b);
   b.player = 1;
   plotMoves(&b,0);
 
