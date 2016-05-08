@@ -4,7 +4,7 @@
 #define BOARD_S 10
 #define INIT_ROWS 2
 #define MAX_POSS_MOVES_FOR_BOARD 20
-#define MAX_DEPTH 6
+#define MAX_DEPTH 5
 
 struct board;
 typedef struct board
@@ -15,8 +15,8 @@ typedef struct board
   unsigned char moves_known;
   unsigned char n_moves;
   unsigned char best_i;
-  unsigned char score;
-  unsigned char heuristic;
+  char score;
+  char heuristic;
 } board;
 int i(int x,int y)
 {
@@ -160,13 +160,10 @@ int rateBoard(board *b) //+ for p1, - for p2
 {
   int n_1 = 0;
   int n_2 = 0;
-  for(int y = 0; y < BOARD_S; y++)
+  for(int i = 0; i < (BOARD_S*BOARD_S)/2; i++)
   {
-    for(int x = 0; x < BOARD_S; x++)
-    {
-      if(b->pos[i(x,y)] == 1) n_1++;
-      if(b->pos[i(x,y)] == 2) n_2++;
-    }
+    if(b->pos[i] == 1) n_1++;
+    if(b->pos[i] == 2) n_2++;
   }
   b->heuristic = n_1-n_2;
   return b->heuristic;
