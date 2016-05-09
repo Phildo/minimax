@@ -1,8 +1,8 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define BOARD_S 5
-#define INIT_ROWS 2
+#define BOARD_S 6
+#define INIT_ROWS 1
 #define MAX_POSS_MOVES_FOR_BOARD 20
 #define MAX_DEPTH 9999
 
@@ -184,39 +184,33 @@ int plotMoves(board *b, int pivot, int depth)
     return b->score;
   }
 
-  int best_i = 0;
-  int best_s;
-  if(b->player == 1) best_s = -99999;
-  if(b->player == 2) best_s =  99999;
-  else best_s = 0; //should never happen
+  b->best_i = 0;
+  if(b->player == 1) b->score = -128;
+  if(b->player == 2) b->score =  -127;
+  else b->score = 0; //should never happen
   int s;
   for(int i = 0; i < b->n_moves; i++)
   {
     s = plotMoves(&b->moves[i],b->heuristic,depth+1);
 
     if(
-      (b->player == 1 && s > best_s) ||
-      (b->player == 2 && s < best_s)
+      (b->player == 1 && s > b->score) ||
+      (b->player == 2 && s < b->score)
     )
     {
-      best_s = s;
-      best_i = i;
+      b->score = s;
+      b->best_i = i;
       if(
-        (b->player == 1 && best_s > pivot) ||
-        (b->player == 2 && best_s < pivot)
+        (b->player == 1 && b->score > pivot) ||
+        (b->player == 2 && b->score < pivot)
       )
       {
-        b->best_i = best_i;
-        b->score = best_s;
-        printf("prune (%d@%d) %d/%d @ depth %d\n",best_s,b->heuristic,best_i,b->n_moves,depth);
-        return best_s;
+        printf("prune (%d@%d) %d/%d @ depth %d\n",b->score,b->heuristic,b->best_i,b->n_moves,depth);
+        return b->score;
       }
     }
   }
-
-  b->best_i = best_i;
-  b->score = best_s;
-  return best_s;
+  return b->score;
 }
 
 void cleanupBoard(board *b)
@@ -243,6 +237,7 @@ int main()
   {
     printBoard(t);
     printf("\n");
+    printf("%d\n",t->best_i);
     fflush(0);
     t = &t->moves[t->best_i];
     if(!t->moves_known) plotMoves(t,t->heuristic,0);
