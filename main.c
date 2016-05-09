@@ -1,22 +1,20 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#define BOARD_S 6
+#define BOARD_S 5
 #define INIT_ROWS 1
-#define MAX_POSS_MOVES_FOR_BOARD 20
 #define MAX_DEPTH 9999
+#define PRUNE 0
 
 struct board;
 typedef struct board
 {
   unsigned char player;
   unsigned char pos[(BOARD_S*BOARD_S)/2];
-  struct board *moves;
-  unsigned char moves_known;
-  unsigned char n_moves;
-  unsigned char best_i;
-  char score;
+  unsigned char has_move;
+  struct board *best;
   char heuristic;
+  char score;
 } board;
 int i(int x,int y)
 {
@@ -32,9 +30,8 @@ int posValid(int x, int y)
 
 void zeroBoard(board *b)
 {
-  b->moves = 0;
-  b->moves_known = 0;
-  b->n_moves = 0;
+  b->best = 0;
+  b->has_move = 0;
 }
 void initBoard(board *b)
 {
@@ -93,69 +90,6 @@ void printBoard(board *b)
   }
 }
 
-void appendBoards(board *b, int x, int y, int xdir, int ydir, board *boards, int *boards_i)
-{
-  if(posValid(x+xdir,y+ydir))
-  {
-    if(b->pos[i(x+xdir,y+ydir)] == 0) //move
-    {
-      copyBoard(b,&boards[*boards_i]);
-      boardSwap(x,y,x+xdir,y+ydir,&boards[*boards_i]);
-      boards[*boards_i].player = b->player == 1 ? 2 : 1;
-      *boards_i = *boards_i+1;
-    }
-    else if( //jump
-      b->pos[i(x+xdir,y+ydir)] != b->player &&
-      posValid(x+(2*xdir),y+(2*ydir)) &&
-      b->pos[i(x+(2*xdir),y+(2*ydir))] == 0
-    )
-    {
-      copyBoard(b,&boards[*boards_i]);
-      boardSwap(x,y,x+(2*xdir),y+(2*ydir),&boards[*boards_i]);
-      boards[*boards_i].pos[i(x+xdir,y+ydir)] = 0;
-      boards[*boards_i].player = b->player == 1 ? 2 : 1;
-      *boards_i = *boards_i+1;
-    }
-  }
-}
-
-void possibleMoves(board *b)
-{
-  board *boards = (board *)malloc(sizeof(board)*MAX_POSS_MOVES_FOR_BOARD);
-  if(boards == 0) printf("nomem!\n");
-  for(int i = 0; i < MAX_POSS_MOVES_FOR_BOARD; i++)
-    zeroBoard(&boards[i]);
-
-  int boards_i = 0;
-  for(int y = 0; y < BOARD_S; y++)
-  {
-    for(int x = 0; x < BOARD_S; x++)
-    {
-      if(b->pos[i(x,y)] == b->player)
-      {
-        appendBoards(b, x, y, -1, (b->player == 1 ? 1 : -1), boards, &boards_i);
-        appendBoards(b, x, y,  1, (b->player == 1 ? 1 : -1), boards, &boards_i);
-      }
-    }
-  }
-
-  if(boards_i >= MAX_POSS_MOVES_FOR_BOARD)
-    printf("badmax! %d\n",boards_i);
-
-  if(boards_i > 0)
-  {
-    b->moves = (board *)malloc(sizeof(board)*boards_i);
-    if(b->moves == 0) printf("nomem!\n");
-
-    for(int i = 0; i < boards_i; i++)
-      b->moves[i] = boards[i];
-  }
-  free(boards);
-
-  b->n_moves = boards_i;
-  b->moves_known = 1;
-}
-
 int rateBoard(board *b) //+ for p1, - for p2
 {
   int n_1 = 0;
@@ -171,55 +105,97 @@ int rateBoard(board *b) //+ for p1, - for p2
 
 int plotMoves(board *b, int pivot, int depth)
 {
-  rateBoard(b);
-  if(!b->moves_known && depth < MAX_DEPTH) possibleMoves(b);
-
-  if(!b->moves_known && depth >= MAX_DEPTH)
-  {
-    return rateBoard(b);
-  }
-  if(b->moves_known && b->n_moves == 0)
-  {
-    b->score = rateBoard(b);
-    return b->score;
-  }
-
-  b->best_i = 0;
-  if(b->player == 1) b->score = -128;
-  if(b->player == 2) b->score =  -127;
-  else b->score = 0; //should never happen
+  board test; zeroBoard(&test);
+  int xdir = 0;
+  int ydir = 0;
+  int move_found = 0;
   int s;
-  for(int i = 0; i < b->n_moves; i++)
-  {
-    s = plotMoves(&b->moves[i],b->heuristic,depth+1);
 
-    if(
-      (b->player == 1 && s > b->score) ||
-      (b->player == 2 && s < b->score)
-    )
+  rateBoard(b);
+  if(depth >= MAX_DEPTH) return b->heuristic;
+
+  for(int y = 0; y < BOARD_S; y++)
+  {
+    for(int x = 0; x < BOARD_S; x++)
     {
-      b->score = s;
-      b->best_i = i;
-      if(
-        (b->player == 1 && b->score > pivot) ||
-        (b->player == 2 && b->score < pivot)
-      )
+      if(b->pos[i(x,y)] == b->player)
       {
-        printf("prune (%d@%d) %d/%d @ depth %d\n",b->score,b->heuristic,b->best_i,b->n_moves,depth);
-        return b->score;
+        ydir = (b->player == 1 ? 1 : -1);
+        move_found = 0;
+        for(xdir = -1; xdir <= 1; xdir+=2)
+        {
+          if(posValid(x+xdir,y+ydir))
+          {
+            if(b->pos[i(x+xdir,y+ydir)] == 0) //move
+            {
+              copyBoard(b,&test);
+              boardSwap(x,y,x+xdir,y+ydir,&test);
+              test.player = b->player == 1 ? 2 : 1;
+              move_found = 1;
+            }
+            else if( //jump
+              b->pos[i(x+xdir,y+ydir)] != b->player &&
+              posValid(x+(2*xdir),y+(2*ydir)) &&
+              b->pos[i(x+(2*xdir),y+(2*ydir))] == 0
+            )
+            {
+              copyBoard(b,&test);
+              boardSwap(x,y,x+(2*xdir),y+(2*ydir),&test);
+              test.pos[i(x+xdir,y+ydir)] = 0;
+              test.player = b->player == 1 ? 2 : 1;
+              move_found = 1;
+            }
+
+            if(move_found)
+            {
+              s = plotMoves(&test,b->heuristic,depth+1);
+
+              if(
+                !b->has_move ||
+                (b->player == 1 && s > b->score) ||
+                (b->player == 2 && s < b->score)
+              )
+              {
+                if(!b->has_move)
+                {
+                  b->best = (board *)malloc(sizeof(board));
+                  b->has_move = 1;
+                }
+                b->score = s;
+                copyBoard(&test,b->best);
+                #if PRUNE
+                if(
+                  (b->player == 1 && b->score > pivot) ||
+                  (b->player == 2 && b->score < pivot)
+                )
+                {
+                  printf("prune %d->%d @ depth %d\n",b->heuristic,b->score,depth);
+                  return b->score;
+                }
+                #endif
+              }
+            }
+          }
+        }
       }
     }
   }
+
+  if(!b->has_move)
+  {
+    b->score = b->heuristic;
+    return b->score;
+  }
+
   return b->score;
 }
 
 void cleanupBoard(board *b)
 {
-  if(b->moves_known && b->n_moves)
+  if(b->has_move)
   {
-    for(int i = 0; i < b->n_moves; i++)
-      cleanupBoard(&b->moves[i]);
-    free(b->moves);
+    cleanupBoard(b->best);
+    free(b->best);
   }
 }
 
@@ -233,14 +209,13 @@ int main()
 
   board *t = &b;
 
-  while(t->n_moves)
+  while(t->has_move)
   {
     printBoard(t);
     printf("\n");
-    printf("%d\n",t->best_i);
     fflush(0);
-    t = &t->moves[t->best_i];
-    if(!t->moves_known) plotMoves(t,t->heuristic,0);
+    t = t->best;
+    if(!t->has_move) plotMoves(t,t->heuristic,0);
   }
   printBoard(t);
 
