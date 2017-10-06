@@ -8,3 +8,6 @@ debug:
 valgrind:
 	gcc -g -O0 main.c -o a.out && valgrind -v --leak-check=yes --leak-check=full --show-leak-kinds=all ./a.out
 
+clean:
+	rm -r a.out a.out.dSYM
+
